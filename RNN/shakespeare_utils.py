@@ -14,11 +14,13 @@ import io
 def build_data(text, Tx = 40, stride = 3):
     """
     Create a training set by scanning a window of size Tx over the text corpus, with stride 3.
-    
+
+    生成训练集：以stride步长扫描文本，取Tx长度的字符段做为样本X(特征)，X的最后一个字符作为样本Y(Label)
+
     Arguments:
-    text -- string, corpus of Shakespearian poem
-    Tx -- sequence length, number of time-steps (or characters) in one training example
-    stride -- how much the window shifts itself while scanning
+    text -- string, corpus of Shakespearian poem   诗集
+    Tx -- sequence length, number of time-steps (or characters) in one training example  一个训练样本的字符长度
+    stride -- how much the window shifts itself while scanning  扫描时窗口移动步长
     
     Returns:
     X -- list of training examples
@@ -42,7 +44,9 @@ def build_data(text, Tx = 40, stride = 3):
 def vectorization(X, Y, n_x, char_indices, Tx = 40):
     """
     Convert X and Y (lists) into arrays to be given to a recurrent neural network.
-    
+
+    将X、Y 向量化
+
     Arguments:
     X -- 
     Y -- 
@@ -63,15 +67,20 @@ def vectorization(X, Y, n_x, char_indices, Tx = 40):
         
     return x, y 
 
-
+# Theano 中的sample方法
+# e^(log(a)) = a
+# 当temperature = 1 时，输出原来的概率分布
+# 当temperature < 1 时，输出较保守，相当对概率分布做了乘方，原来概率大的会更大，小的会更小，概率分布更陡。
+# 当temperature > 1 时，输出较开放，相当对概率分布做了开方，原来概率大会变小，小的会变大，概率分布趁于平缓，这样会增加更多的多样性 。
 def sample(preds, temperature=1.0):
     # helper function to sample an index from a probability array
     preds = np.asarray(preds).astype('float64')
     preds = np.log(preds) / temperature
     exp_preds = np.exp(preds)
     preds = exp_preds / np.sum(exp_preds)
+    # 生成多项式分布
     probas = np.random.multinomial(1, preds, 1)
-    out = np.random.choice(range(len(chars)), p = probas.ravel())
+    out = np.random.choice(range(len(chars)), p = probas.ravel()) #根据概率大小挑选
     return out
     #return np.argmax(probas)
     
@@ -119,6 +128,7 @@ text = io.open('shakespeare.txt', encoding='utf-8').read().lower()
 #print('corpus length:', len(text))
 
 Tx = 40
+# 由样本，得到字符表
 chars = sorted(list(set(text)))
 char_indices = dict((c, i) for i, c in enumerate(chars))
 indices_char = dict((i, c) for i, c in enumerate(chars))
@@ -138,7 +148,7 @@ def generate_output():
     #sentence = '0'*Tx
     usr_input = input("Write the beginning of your poem, the Shakespeare machine will complete it. Your input is: ")
     # zero pad the sentence to Tx characters.
-    sentence = ('{0:0>' + str(Tx) + '}').format(usr_input).lower()
+    sentence = ('{0:0>' + str(Tx) + '}').format(usr_input).lower()  # 如果输入的字符数，不足Tx个，前面以0补上
     generated += usr_input 
 
     sys.stdout.write("\n\nHere is your poem: \n\n") 
@@ -147,14 +157,19 @@ def generate_output():
 
         x_pred = np.zeros((1, Tx, len(chars)))
 
+        # 将已有的句子转为one-host向量
         for t, char in enumerate(sentence):
             if char != '0':
                 x_pred[0, t, char_indices[char]] = 1.
 
+        # 预测下一个字符的概率
         preds = model.predict(x_pred, verbose=0)[0]
+        # 根据概率分布进行采样
         next_index = sample(preds, temperature = 1.0)
+        # 转为字符串
         next_char = indices_char[next_index]
 
+        # 更新生成的序列
         generated += next_char
         sentence = sentence[1:] + next_char
 
